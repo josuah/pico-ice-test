@@ -34,14 +34,14 @@ main(void)
 	gpio_set_function(PICO_DEFAULT_SPI_TX_PIN, GPIO_FUNC_SPI);
 	gpio_set_function(PICO_DEFAULT_SPI_RX_PIN, GPIO_FUNC_SPI);
 	gpio_init(PICO_DEFAULT_SPI_CSN_PIN);
-	gpio_put(PICO_DEFAULT_SPI_CSN_PIN, 1);
 	gpio_set_dir(PICO_DEFAULT_SPI_CSN_PIN, GPIO_OUT);
+	gpio_put(PICO_DEFAULT_SPI_CSN_PIN, 1);
 
 	memset(page, 0xFF, sizeof page);
 
-	flash_program_page(spi_default, 0x000000, page);
+	flash_program_page(spi_default, PICO_DEFAULT_SPI_CSN_PIN, 0x000000, page);
 	for (;;) {
-		flash_read_page(spi_default, 0x000000, page);
+		flash_read(spi_default, PICO_DEFAULT_SPI_CSN_PIN, 0x000000, page, FLASH_PAGE_SIZE);
 		print_page(page);
 	}
 
