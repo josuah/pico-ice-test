@@ -1,49 +1,47 @@
 /* Send requests to a Wishbone B4 bus as master through SPI */
 
-#include "pico/stdlib.h"
-#include "pico/stdio.h"
-#include "hardware/spi.h"
-#include "hardware/gpio.h"
-#include "pico-ice/flash.h"
+#include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <ctype.h>
+#include "pico/stdlib.h"
+#include "pico/stdio.h"
+#include "hardware/gpio.h"
+#include "pico-ice/flash.h"
+#include "pico-ice/ice.h"
+#include "tusb.h"
 
-void
-print_page(uint8_t const *page)
+static void
+cdc_task(void)
 {
-	for (size_t i = 0; i < FLASH_PAGE_SIZE; i++) {
-		printf(" %02X", page[i]);
-		if ((i + 1) % 32 == 0)
-			printf("\n");
-	}
+    uint8_t buf[64];
+    uint32_t sz;
+
+    if (!tud_cdc_n_available(0))
+        return;
+
+    sz = tud_cdc_n_read(0, buf, sizeof(buf));
+    for (uint32_t i = 0; i < sz; i++)
+        tud_cdc_n_write_char(0, toupper(buf[i]));
+    tud_cdc_n_write_flush(0);
 }
 
 int
 main(void)
 {
-	uint8_t page[FLASH_PAGE_SIZE] = {0};
+    stdio_init_all();
 
-	stdio_init_all();
+    ice_flash_init();
+    gpio_init(25);
+    gpio_set_dir_out_masked(1 << 25);
 
-	gpio_init(25);
-	gpio_set_dir_out_masked(1 << 25);
-	gpio_put(25, true);
+    tusb_init();
 
-	spi_init(spi_default, 1000 * 1000);
-	gpio_set_function(PICO_DEFAULT_SPI_SCK_PIN, GPIO_FUNC_SPI);
-	gpio_set_function(PICO_DEFAULT_SPI_TX_PIN, GPIO_FUNC_SPI);
-	gpio_set_function(PICO_DEFAULT_SPI_RX_PIN, GPIO_FUNC_SPI);
-	gpio_init(PICO_DEFAULT_SPI_CSN_PIN);
-	gpio_set_dir(PICO_DEFAULT_SPI_CSN_PIN, GPIO_OUT);
-	gpio_put(PICO_DEFAULT_SPI_CSN_PIN, 1);
+    for (;;) {
+        tud_task();
+        cdc_task();
+        gpio_put(25, true);
+    }
 
-	memset(page, 0xFF, sizeof page);
-
-	flash_program_page(spi_default, PICO_DEFAULT_SPI_CSN_PIN, 0x000000, page);
-	for (;;) {
-		flash_read(spi_default, PICO_DEFAULT_SPI_CSN_PIN, 0x000000, page, FLASH_PAGE_SIZE);
-		print_page(page);
-	}
-
-	return 0;
+    return 0;
 }
